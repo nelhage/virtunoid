@@ -244,9 +244,6 @@ hva_t gva_to_hva(gva_t addr) {
     return gpa_to_hva(gva_to_gpa(addr));
 }
 
-/* Offset of the ICMP header inside qemu's net queue buffer */
-#define PACKET_OFFSET   74
-
 #define PORT 0xae08
 #define QEMU_GATEWAY  "10.0.2.2"
 

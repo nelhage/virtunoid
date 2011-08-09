@@ -54,4 +54,9 @@
 #define HPET_CFG                 0x959e20
 #define SIZEOF_HPET_CFG          121
 
+/* Offset of the ICMP data inside qemu's net queue buffer */
+/* = sizeof(NetPacket) + sizeof(iphdr) + sizeof(icmphdr) + some
+   other crap I've forgotten */
+#define PACKET_OFFSET   74
+
 #undef HAVE_TIMER_SCALE
