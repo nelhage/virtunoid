@@ -1,0 +1,61 @@
+virtunoid -- a guest -> host breakout for qemu-kvm
+Nelson Elhage <nelhage@nelhage.com>
+@nelhage
+http://blog.nelhage.com/
+
+This is an exploit for CVE-2011-1751, a missing check in the qemu-kvm
+userspace driver for the KVM Linux Kernel-mode Virtual Machine. For
+more information, see the slides from my talk at BlackHat/DEFCON 2011:
+<http://nelhage.com/talks/kvm-defcon-2011.pdf>
+
+RUNNING THE EXPLOIT
+-------------------
+
+The exploit expects to be run as root inside a guest. For maximum
+reliability, the provided Makefile builds an initrd containing the
+exploit that can be used to run the exploit in as minimal an
+environment as possible. While I have seen the exploit work inside a
+fully booted Linux guest, there is a high chance of just crashing the
+host.
+
+The provided linux-3.0.0-config Linux config file contains the config
+I used for my demo at DEFCON. The details of the config aren't too
+important, except that it needs to contain an appropriate driver for
+the virtual network card; I've just provided mine for
+convenience. I've also posted a suitable bzImage at
+<http://dl.dropbox.com/u/2595898/bzImage-kvm-demo>.
+
+To run the exploit, build an appopriate kernel or download mine, and
+run
+
+  kvm -kernel bzImage -initrd initrd.gz
+
+virtunoid-config.h contains various addresses needed for the
+exploit. The provided version is targeted at Ubuntu's
+qemu-kvm_0.14.0+noroms-0ubuntu4_amd6, which can be downloaded from
+<https://launchpad.net/ubuntu/+source/qemu-kvm/0.14.0+noroms-0ubuntu4/+build/2385343/+files/qemu-kvm_0.14.0%2Bnoroms-0ubuntu4_amd64.deb>
+
+For any other version, the addresses and some of the offsets in
+virtunoid-config.h will need to be tweaked.
+
+KNOWN ISSUES
+------------
+
+Most of these could be fixed, but I didn't feel particularly inclined
+for a proof-of-concept exploit. If you do feel like fixing one or
+more, let me know.
+
+* This exploit requires "-net user" with the default settings (or no
+  -net options at all, which defaults to "-net nic -net user"). This
+  requirement could be fixed, but this is a proof-of-concept.
+
+* This exploit only works on the specific Ubuntu qemu-kvm build it is
+  built for. This exploit uses symbols that don't exist prior to
+  qemu-kvm 0.13.51.
+
+* This exploit is still somewhat unreliable. I observe a failure rate
+  of maybe 1 in 20 running it from an initrd on my test rig. There are
+  a few different failure modes, the most common being SEGVing
+  qemu-kvm instead of successful exploitation.
+
+* The guest locks up after the exploit.

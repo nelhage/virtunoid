@@ -1,12 +1,16 @@
 /* virtunoid.c: qemu-kvm escape exploit, 0.13.51 <= qemu-kvm <= 0.14.50
  *  by Nelson Elhage <nelhage@nelhage.com>
  *
- * Exploits CVE-2011-1751, insufficient checking in PCI hotplug.
+ * Exploits CVE-2011-1751, insufficient checks in PCI hotplug.
  *
  * The underlying bug exists since qemu-kvm 0.11.51, but this exploit
  * uses features introduced in qemu-kvm 0.13.51. We choose to do this
  * for simplicity, and in order to limit the scope of this exploit,
  * since this is intended as a proof-of-concept.
+ *
+ * I presented on this bug at BlackHat/DEFCON 2011. Slides are
+ * available at <http://nelhage.com/talks/kvm-defcon-2011.pdf>, and
+ * include a detailed discussion of this exploit.
  */
 
 #include <sys/io.h>
