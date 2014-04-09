@@ -23,7 +23,7 @@ I used for my demo at DEFCON. The details of the config aren't too
 important, except that it needs to contain an appropriate driver for
 the virtual network card; I've just provided mine for
 convenience. I've also posted a suitable bzImage at
-<http://dl.dropbox.com/u/2595898/bzImage-kvm-demo>.
+<https://nelhage.com/files/bzImage-kvm-demo>.
 
 To run the exploit, build an appopriate kernel or download mine, and
 run
